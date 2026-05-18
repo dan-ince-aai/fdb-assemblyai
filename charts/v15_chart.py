@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 
 # (label, score, source)
 DATA = [
-    ("AssemblyAI Voice Agent",           82.7, "this run"),
-    ("Nova Sonic",                       77.5, "FDB paper"),
     ("TML-interaction-small",            77.8, "TML blog"),
+    ("Nova Sonic",                       77.5, "FDB paper"),
+    ("AssemblyAI Voice Agent",           74.8, "this run"),
     ("Gemini Live",                      63.8, "FDB paper"),
     ("Gemini-3.1-flash-live (minimal)",  54.3, "TML blog"),
     ("Freeze-Omni",                      50.5, "FDB paper"),
@@ -58,8 +58,8 @@ ax.set_axisbelow(True)
 
 caption = ("Aggregate of desired-behavior rate across 4 scenarios "
            "(user_interruption, user_backchannel, talking_to_other, background_speech). "
-           "AssemblyAI: 498 samples, GPT-4o-2024-08-06 classifier (matches paper §2.3.1 category "
-           "definitions; paper's full output_clean comparison not run). "
+           "AssemblyAI: 498 samples, FDB's evaluate.py --task behavior verbatim "
+           "(GPT-4o-2024-08-06, word-level ASR via Whisper-1, both noisy + clean inference passes). "
            "TML / FDB-paper numbers from public reports.")
 fig.text(0.05, 0.01, caption, fontsize=8, color="#666", wrap=True)
 

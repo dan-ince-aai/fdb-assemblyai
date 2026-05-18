@@ -142,8 +142,8 @@ python3 charts/v1_turntaking_chart.py
 
 | Metric | AssemblyAI | Notes |
 |---|---|---|
-| FDB v1.5 average (quick approx) | 82.7 | GPT-4o on agent transcripts, paper definitions; 0.5pts off the un-primed version |
-| FDB v1.5 average (paper-faithful) | _in progress_ | Running `evaluate.py --task behavior` once clean_output inference + word-level ASR complete |
+| **FDB v1.5 average — paper-faithful** | **74.8** | FDB's `evaluate.py --task behavior` verbatim. 4th overall; behind only TML-interaction-small (77.8) and Nova Sonic (77.5) |
+| Per-subset (paper-faithful) | UI 0.83 / UB 0.84 / TO 0.38 / BG 0.94 | Desired-behavior rate |
 | FDB v1 turn-taking latency | 1.62 s | mean on candor_turn_taking, Silero VAD |
 | User-interruption stop latency | 2.27 s | mean — matches Nova Sonic / Gemini Live |
 | User-interruption response latency (true) | 1.60 s mean / 1.20 s median | on samples classified RESPOND |

@@ -26,12 +26,15 @@ import httpx
 API_KEY = os.environ["OPENAI_API_KEY"]
 CONCURRENCY = 5
 
-# (wav_filename, transcript_filename)
+# (wav_filename, transcript_filename_simple, transcript_filename_word)
+# When --word-timestamps is set, the word-level filename is used and matches
+# FDB's expected output.json / clean_output.json convention so the paper's
+# evaluate.py --task behavior can consume them.
 AUDIO_PAIRS = [
-    ("output.wav",         "agent_transcript.json"),
-    ("clean_output.wav",   "clean_agent_transcript.json"),
-    ("input.wav",          "input.json"),        # only if missing — FDB ships these
-    ("clean_input.wav",    "clean_input.json"),  # same
+    ("output.wav",        "agent_transcript.json",         "output.json"),
+    ("clean_output.wav",  "clean_agent_transcript.json",   "clean_output.json"),
+    ("input.wav",         "input.json",                    "input.json"),
+    ("clean_input.wav",   "clean_input.json",              "clean_input.json"),
 ]
 
 
@@ -84,6 +87,10 @@ async def process(sem, client, folder: Path, wav_name: str, tx_name: str, word_t
             return f"ERR  {folder.parent.name}/{folder.name}/{wav_name}: {type(e).__name__}: {e}"
 
 
+def select_tx_name(wav_name: str, tx_simple: str, tx_word: str, word_timestamps: bool) -> str:
+    return tx_word if word_timestamps else tx_simple
+
+
 async def main():
     p = argparse.ArgumentParser()
     p.add_argument("dataset_root", help="Path to Full-Duplex-Bench-Data")
@@ -110,7 +117,8 @@ async def main():
         for folder in sorted(root.iterdir()):
             if not (folder.is_dir() and folder.name.isdigit()):
                 continue
-            for wav_name, tx_name in AUDIO_PAIRS:
+            for wav_name, tx_simple, tx_word in AUDIO_PAIRS:
+                tx_name = select_tx_name(wav_name, tx_simple, tx_word, args.word_timestamps)
                 if (folder / wav_name).exists() and not (folder / tx_name).exists():
                     todo.append((folder, wav_name, tx_name))
 

@@ -1,0 +1,20 @@
+diff --git a/v1_v1.5/evaluation/eval_behavior.py b/v1_v1.5/evaluation/eval_behavior.py
+index f00ae67..ae049f5 100644
+--- a/v1_v1.5/evaluation/eval_behavior.py
++++ b/v1_v1.5/evaluation/eval_behavior.py
+@@ -119,10 +119,13 @@ def eval_behavior_all(data_dir, client, task, aggregate=False):
+ 
+     for dir_path in folders:
+ 
+-        # first check if tax_cot.json exists
++        # first check if content_tag.json exists — skip if so
+         tax_cot_path = os.path.join(dir_path, "content_tag.json")
+         if os.path.exists(tax_cot_path):
+-            print(f"Found {tax_cot_path}")
++            print(f"Skipping {dir_path} — content_tag.json already exists")
++            with open(tax_cot_path, "r") as f:
++                output_list.append(json.load(f))
++            continue
+ 
+         print(f"Evaluating {dir_path}...")
+         input_clean_name = "clean_input.json"
