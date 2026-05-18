@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Dataset (don't commit — pull from FDB authors' Google Drive)
+Full-Duplex-Bench-Data/
+*.wav
+
+# Logs / runtime artifacts
+*.log
+fdb_run*.log
+results/
+data/
+
+# Secrets — anything that smells like a key
+.env
+.env.local
+*api*key*
+*secret*
+
+# OS
+.DS_Store
