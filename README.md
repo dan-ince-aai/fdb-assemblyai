@@ -140,18 +140,18 @@ python3 charts/v1_turntaking_chart.py
 
 ## Headline numbers (from this repo)
 
-Two full runs to date. May 2026: voice `ivy`, `agents.assemblyai.com`. July 2026: voice `alba`, `agents.us.assemblyai.com`, `session.end` teardown, concurrency 10. May numbers below are recomputed from archived artifacts with the July eval pipeline, so the columns are directly comparable.
+Three runs to date, all scored with one identical pipeline from raw artifacts. Key finding: sessions that omit `turn_detection` use a newer, more eager endpointing mode; sending any explicit `turn_detection` (even the documented defaults) pins classic fixed-window behavior — and recovers the May-level composite.
 
-| Metric | **July 2026** | May 2026 | Notes |
+| Metric | July default | **July + explicit turn_detection** | May 2026 |
 |---|---|---|---|
-| **AA-style composite (equal weights)** | **80.4** | 84.8 | pause + turn-taking + interruption + backchannel |
-| Pause handling (1−TOR, candor/synthetic avg) | 45.7 | 69.6 | the one real regression — agent barges into pauses |
-| Turn-taking TOR / latency | 1.00 / **1.04 s** | 1.00 / 1.45 s | latency improved |
-| Interruption RESPOND (paper-faithful) | 0.84 | 0.84 | identical |
-| Backchannel RESUME (paper-faithful) | **0.92** | 0.86 | improved (after whisper-on-alba transcript repair) |
-| FDB v1.5 average — paper-faithful | 70.5 | 75.4 | gap = talking_to_other + background_speech |
+| **AA-style composite (equal weights)** | 80.4 | **84.7** | 84.8 |
+| Pause handling (1−TOR, candor/synthetic avg) | 45.7 | **70.3** | 69.6 |
+| Turn-taking TOR / latency | 1.00 / **1.04 s** | 0.98 / 1.57 s | 1.00 / 1.45 s |
+| Interruption RESPOND (paper-faithful) | 0.81 | 0.82 | 0.84 |
+| Backchannel RESUME (paper-faithful) | **0.92** | 0.89 | 0.86 |
+| FDB v1.5 average — paper-faithful | 70.5 | 70.3 | 75.4 |
 
-Full July analysis (incl. the turn-detection-eagerness hypothesis and methodology fixes): [report/FDB_REPORT_2026-07.md](report/FDB_REPORT_2026-07.md).
+Full analysis, experiments, and measurement caveats: [report/FDB_REPORT_2026-07.md](report/FDB_REPORT_2026-07.md) (executive summary up top).
 May run writeup: [report/FDB_REPORT.md](report/FDB_REPORT.md).
 
 ## License

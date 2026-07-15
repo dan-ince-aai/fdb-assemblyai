@@ -1,86 +1,75 @@
-# AssemblyAI Voice Agent — Full-Duplex-Bench v1.0 + v1.5 (July 2026 re-run)
+# Full-Duplex-Bench: AssemblyAI Voice Agent — July 2026 Report
 
-**Run date:** 2026-07-15
-**Endpoint:** `wss://agents.us.assemblyai.com/v1/ws` (May run used `agents.assemblyai.com`)
-**Voice:** alba (May: ivy) · **Audio:** 24 kHz PCM16 mono · **Concurrency:** 10 sockets globally, with explicit `session.end` teardown
-**System prompt:** identical generic assistant prompt, no benchmark tuning
-**Coverage:** 1,723/1,723 sessions (498 v1.5 + 498 v1.5 clean pass + 727 v1.0), zero unrecovered errors
-**Baseline:** the 2026-05-18 ivy run, re-evaluated from archived artifacts (`fdb-dataset/backup-2026-05-18-ivy-run/`) with the *identical* July eval pipeline — including the whisper-on-alba transcript repair described below, applied to both runs — so every May number here is pipeline-matched. (May numbers therefore differ slightly from the May report.)
+**Runs compared:** May 2026 baseline (voice `ivy`, `agents.assemblyai.com`) · July 2026 default-config (voice `alba`, `agents.us.assemblyai.com`) · July 2026 explicit turn-detection config (same, plus `turn_detection: {vad_threshold: 0.5, min_silence: 1000, max_silence: 3000}`).
+All three runs scored with one identical eval pipeline, from raw artifacts. 3,200+ inference sessions total, zero unrecovered errors.
 
 ---
 
-## TL;DR
+## Executive summary
 
-**AA-style composite ("weighted average of pause handling, turn-taking, interruption handling, and backchannel handling from FDB v1 and v1.5"): 80.4 July vs 84.8 May (equal weights).** The entire remaining gap is pause handling. Interruption handling is identical, backchannel actually improved, turn-taking latency improved 28%.
+1. **On the leaderboard metric (Artificial-Analysis-style composite: pause handling + turn-taking + interruption + backchannel), the default-config agent scores 80.4, down from 84.8 in May.** One config line — explicitly setting turn detection to its own documented defaults — restores **84.7** today.
 
-| AA composite | July (alba, us host) | May (ivy) |
-|---|---:|---:|
-| Equal weights | **80.4** | 84.8 |
-| Weighted by sample count | **69.5** | 78.8 |
+2. **Root cause of the drop: turn-detection endpointing behavior changed between May and July for sessions that send no `turn_detection` config.** Omitted-config sessions now use a more eager, adaptive endpointing mode; sending *any* explicit `turn_detection` object (even one restating the documented defaults) pins the classic fixed-window behavior. We verified this with five controlled arms on identical samples: the *presence* of the config object, not the values, produces the big shift.
 
-| Component | Definition | July | May | Δ |
-|---|---|---:|---:|---:|
-| Pause handling | % pauses correctly not interrupted, v1.0 (candor+synthetic avg) | **45.7** | 69.6 | **−23.9** |
-| Turn-taking | % turns correctly taken, v1.0 candor | **100** | 100 | 0 |
-| Interruption handling | % RESPOND on user interruptions, v1.5 paper-faithful | **84.0** | 84.0 | 0 |
-| Backchannel handling | % RESUME through backchannels, v1.5 paper-faithful | **91.8** | 85.7 | **+6.1** |
+3. **The eager default is a deliberate trade, and the benchmark sees its worst side.** Default-config turn-taking latency improved 1.45 s → 1.04 s (best-in-class territory), but the agent now barges into natural user pauses ~2.4× more often (pause-handling score 45.7 vs 69.6). FDB's prerecorded clips can never push back on interruptions the way live users do, so the benchmark measures the eager mode's cold start — but real callers experience that same cold start at the top of every call.
 
-AA does not publish weights or pipeline; absolute comparison to their leaderboard (GPT-Realtime ~94–96) is not meaningful. The May↔July deltas, computed with one pipeline on both runs, are the signal.
+4. **Interruption and backchannel handling did not regress** (0.82/0.89 vs May's 0.84/0.86, paper-faithful) — and are unaffected by the endpointing mode. A residual v1.5 regression in `talking_to_other` (0.27–0.32 vs 0.38) and `background_speech` (0.78–0.79 vs 0.94) persists under *both* endpointing modes, so it has a different cause (model/filtering/voice drift since May) and needs separate investigation. Neither subset counts toward the AA composite.
+
+5. **Two measurement bugs would have corrupted these conclusions if uncaught** — whisper-1 collapses transcripts on the alba voice ~6× more than ivy (initially faked a backchannel regression: 0.67 raw → 0.92 repaired), and Whisper hallucinates text on silent audio (364+ transcripts gated). All numbers here are post-repair, applied equally to all runs.
+
+**Recommendations:** (a) decide deliberately which endpointing mode default-config customers should get — today's eager default trades ~4 composite points for ~0.4 s of latency; (b) treat "any config ⇒ fully manual mode" as an API-semantics issue — restating documented defaults should not change behavior; (c) investigate the `talking_to_other`/`background_speech` drift separately; (d) publish benchmark claims from the explicit-config run (84.7) or fix the default cold-start.
 
 ---
 
-## v1.0 results (FDB official ASR-based eval, silence-gated)
+## Scorecard (three runs, one pipeline)
 
-Pipeline: whisper-1 word-level ASR of `output.wav` → FDB `eval_pause_handling.py` / `eval_smooth_turn_taking.py` verbatim. All-zero output wavs are transcript-gated to empty (Whisper hallucinates on silence; 364/943 transcripts across both runs). Identical treatment for both runs.
+| Metric | July default | **July explicit TD** | May baseline |
+|---|---:|---:|---:|
+| **AA-style composite (equal weights)** | 80.4 | **84.7** | 84.8 |
+| Pause handling (1−TOR, candor/synthetic avg) | 45.7 | **70.3** | 69.6 |
+| Turn-taking TOR | 1.000 | 0.975 | 1.000 |
+| Turn-taking latency | **1.04 s** | 1.57 s | 1.45 s |
+| Interruption RESPOND (v1.5 paper) | 0.81 | 0.82 | 0.84 |
+| Backchannel RESUME (v1.5 paper) | **0.92** | 0.89 | 0.86 |
+| talking_to_other RESUME (v1.5 paper)* | 0.27 | 0.32 | 0.38 |
+| background_speech RESUME (v1.5 paper)* | 0.79 | 0.78 | 0.94 |
+| FDB v1.5 average — paper-faithful | 70.5 | 70.3 | 75.4 |
+| FDB v1.5 average — primed GPT-4o | 77.0 | 77.0 | 82.7 |
 
-| Subset | n | Metric | July | May |
-|---|---:|---|---:|---:|
-| candor_pause_handling | 216 | TOR (lower better) | **0.583** | 0.426 |
-| synthetic_pause_handling | 137 | TOR (lower better) | **0.504** | 0.182 |
-| candor_turn_taking | 119 | TOR (higher better) | **1.000** | 1.000 |
-| candor_turn_taking | 119 | response latency (s) | **1.04** | 1.45 |
+\* not part of the AA composite. AA's own weights/pipeline are unpublished; absolute comparison to their leaderboard is not meaningful — run-vs-run deltas on this pipeline are.
 
-Independent VAD cross-check (Silero, FDB `get_timing.py`, no ASR): candor pause TOR 0.583 vs May 0.407; synthetic 0.511 vs 0.146; turn-taking 1.000 vs 0.983. **The pause-handling regression is confirmed by two independent pipelines** — it is not an ASR artifact.
+## The turn-detection experiments
 
-July includes candor_turn_taking sample 62 (94 s input) for the first time in any run — it exceeded the adapter's fixed 90 s timeout in every previous attempt including May's (adapter now scales the timeout with input duration). Its 51.6 s response latency is an outlier worth an ear.
+Controlled probe, same 30 pause-handling samples per arm (15 candor + 15 synthetic), counting pause interruptions:
 
-## v1.5 results (three classifier pipelines, corrected transcripts)
+| Arm | Interrupted |
+|---|---:|
+| No `turn_detection` sent (benchmark run) | 17/30 |
+| No `turn_detection` sent (repeat, same day) | 19/30 |
+| `{vad_threshold: 0.7}` — two runs | 6/30, 8/30 |
+| `{vad_threshold: 0.5, min_silence: 1000, max_silence: 3000}` — **the documented defaults, stated explicitly** | **8/30** |
+| `{min_silence: 2000}` | 2/30 |
+| May baseline, no config | 10/30 |
 
-| Subset (desired) | Paper July | Paper May | Primed July | Primed May | Neutral July | Neutral May |
-|---|---:|---:|---:|---:|---:|---:|
-| user_interruption (RESPOND) | **0.84** | 0.84 | 0.83 | 0.81 | 0.86 | 0.81 |
-| user_backchannel (RESUME) | **0.92** | 0.86 | 0.94 | 0.96 | 0.92 | 0.97 |
-| talking_to_other (RESUME) | **0.27** | 0.38 | 0.46 | 0.55 | 0.39 | 0.51 |
-| background_speech (RESUME) | **0.79** | 0.94 | 0.85 | 0.99 | 0.85 | 0.99 |
-| **Average ×100** | **70.5** | 75.4 | **77.0** | 82.7 | **75.3** | 81.9 |
+The explicit-documented-defaults arm is the control that isolates the mechanism: identical values to the implicit default, ~2.3× fewer interruptions. Run-to-run noise is ±2/30 (26/30 identical verdicts between repeat runs), so these separations are far outside noise. The full-scale explicit run (1,468 sessions) confirmed the probe: pause TOR 0.324/0.270 (candor/synthetic) vs 0.583/0.504 default.
 
-## Reading the deltas
+Supporting evidence for eager-mode side effects in the default run: "sorry, you were saying?"-style recovery phrases appear 7× in July default transcripts vs 1× in May, concentrated in pause-handling samples; "echo the question back" clarifying replies to interruptions rose 4% → 11%.
 
-- **Pause handling (large, real regression):** agent takes the floor during natural user pauses in 50–58% of samples vs 15–43% in May.
-- **Talking-to-other / background-speech (regression):** the floor-holding-through-third-party-speech axes dropped on all three pipelines (TO 0.27–0.46 vs 0.38–0.55; BG 0.79–0.85 vs 0.94–0.99). 16 July samples (12 BG, 4 TO) have all-zero output — the agent never spoke at all.
-- **Turn-taking latency (improvement):** 1.45 s → 1.04 s at 100% TOR both runs.
-- **Interruption (flat mechanically, softer qualitatively):** RESPOND rate identical (0.84), but "echo the question back" clarifying replies ("Are you asking about financial goals…?" in reply to *"what financial goals should I set?"*) rose from 4% (8/200) to **11% (22/200)**. FDB counts content-specific clarification as RESPOND, so this quality drop is invisible in the score.
-- **Backchannel (improvement):** 0.92 vs 0.86 paper-faithful once transcripts were repaired.
+## Measurement integrity (read before re-running)
 
-One coherent story fits: **the endpoint's turn detector became more eager** — faster to conclude the user is done (latency win) and quicker to treat pauses and third-party speech as turn-yields (floor-holding losses). Confounds not fully excluded: voice (alba vs ivy) and regional host (`us.` vs global), though neither should drive speak/don't-speak decisions.
+1. **whisper-1 collapses on alba.** Word-timestamp mode transcribed 59 July files (vs 10 May) of intelligible speech as "Thanks for watching." — triggered by 3–4 s of leading silence, hit ~6× more often with alba than ivy. Detection: >2.5 s voiced audio, <5 transcribed words. Fix: trim leading silence, re-transcribe, shift timestamps back. Unrepaired, this fakes a 25-point backchannel regression.
+2. **Whisper hallucinates on silence.** Pause-handling outputs are often all-zero (correct behavior = silence); transcripts must be gated to empty before TOR scoring (364/943 v1.0 transcripts affected).
+3. **Native `transcript.agent` misses post-overlap replies** that arrive after the capture window — classify from ASR of `output.wav`, never from native transcripts (0/88 false-RESUME otherwise).
+4. **FDB's behavior eval caches `content_tag.json` per sample** and silently reuses it — purge before re-evaluating a new run.
+5. Adapter/harness fixes this cycle: explicit `session.end` teardown (closing the socket without it leaves a 30 s billable zombie session that counts against per-key concurrency — root cause of the old 5-socket ceiling; 10 is now clean), duration-scaled per-sample timeout (fixes the never-completing 94 s sample), `run_all.sh` clean-pass arg forwarding, classifier 429 retry/backoff, `--turn-detection` flag on the adapter.
 
----
+## Run inventory
 
-## Measurement bug found and fixed: whisper-1 collapses on alba
-
-whisper-1's word-timestamp mode collapsed **59 July transcripts (vs 10 May)** — files with 7–10 s of clearly intelligible speech transcribed as just "Thanks for watching." (its signature silence-hallucination, triggered by ~3–4 s of leading silence; alba trips it ~6× more than ivy). 48 of the 59 were in user_backchannel, which initially made backchannel look like it regressed 0.86→0.67 when it had actually **improved**. Human listening + native `transcript.agent` + normal pitch stats confirmed the audio was fine.
-
-**Fix (applied to both runs before all numbers above):** trim leading sub-threshold audio before sending to whisper-1, shift word timestamps back by the trim offset, invalidate and re-run classification for affected samples. Detection heuristic: >2.5 s of voiced audio but <5 transcribed words.
-
-## Other methodology fixes made during this run
-
-1. **`session.end` teardown** (adapter): closing the socket without it leaves each session resumable *and billable* for 30 s, and the zombies count against the per-key concurrency limit — the real cause of the old "5 sockets max" rule. Concurrency 10 is now error-free (20 still isn't). Side benefit: native transcript capture rose from 200/498 to 473/498.
-2. **Duration-scaled per-sample timeout** (adapter): `max(90 s, input + 30 s)`.
-3. **`run_all.sh` arg forwarding**: the v1.5 clean-pass `--input/--output-name` flags were silently dropped; the clean pass never ran via the script before.
-4. **Classifier response-text source**: native `transcript.agent` misses post-overlap replies that arrive after the capture window (0/88 RESPOND on affected user_interruption samples). Classifiers now read Whisper ASR of `output.wav`.
-5. **Silence gating before v1.0 TOR eval** (Whisper hallucinates on all-zero wavs; 364/943 affected).
-6. **`content_tag.json` purging**: FDB's behavior eval silently reuses cached per-sample results; stale caches from a previous run must be removed before re-evaluating.
-7. **Retry/backoff + skip-existing in classifiers** (fresh OpenAI keys rate-limit hard).
+| Run | Sessions | Where |
+|---|---:|---|
+| May 2026 baseline (ivy, no config) | 1,723 | `fdb-dataset/backup-2026-05-18-ivy-run/` |
+| July 2026 default (alba, no config) | 1,723 | `fdb-dataset/backup-2026-07-15-alba-noconfig/` |
+| July 2026 explicit TD (alba) | 1,468 (7 TD-sensitive subsets + clean pass) | `fdb-dataset/Full-Duplex-Bench-Data/` (in place) |
 
 ## Reproducing
 
@@ -88,22 +77,10 @@ whisper-1's word-timestamp mode collapsed **59 July transcripts (vs 10 May)** �
 export ASSEMBLYAI_API_KEY=... OPENAI_API_KEY=...
 export FDB_DATASET=/path/to/Full-Duplex-Bench-Data
 export FDB_CONCURRENCY=10
-bash scripts/run_all.sh                                  # inference, all subsets + clean pass
-
-# timing (Silero VAD)
-for sub in v1.0/* v1.5/*; do python3 fdb-eval/v1_v1.5/evaluation/get_timing.py --root_dir "$FDB_DATASET/$sub"; done
-
-# word-level ASR (then: silence-gate all-zero wavs; trim-fix any >2.5s-voiced/<5-word transcripts)
-python3 eval/whisper_asr.py "$FDB_DATASET" --word-timestamps
-
-# FDB official evals
-python3 fdb-eval/v1_v1.5/evaluation/evaluate.py --task pause_handling     --root_dir "$FDB_DATASET/v1.0/candor_pause_handling"
-python3 fdb-eval/v1_v1.5/evaluation/evaluate.py --task pause_handling     --root_dir "$FDB_DATASET/v1.0/synthetic_pause_handling"
-python3 fdb-eval/v1_v1.5/evaluation/evaluate.py --task smooth_turn_taking --root_dir "$FDB_DATASET/v1.0/candor_turn_taking"
-python3 fdb-eval/v1_v1.5/evaluation/evaluate.py --task behavior           --root_dir "$FDB_DATASET/v1.5/<subset>"   # ×4
-
-# classifier pipelines + aggregate
-python3 eval/classify_simplified.py "$FDB_DATASET"
-python3 eval/classify_neutral.py "$FDB_DATASET"
-python3 eval/aggregate.py "$FDB_DATASET"
+bash scripts/run_all.sh                       # default-config run
+# explicit turn-detection run:
+python3 adapter/run_inference.py "$FDB_DATASET/v1.0/candor_pause_handling" --concurrency 10 \
+  --turn-detection '{"vad_threshold": 0.5, "min_silence": 1000, "max_silence": 3000}'
+# ... then per subset: get_timing.py, whisper_asr.py --word-timestamps (+ silence gate + trim fix),
+# evaluate.py --task pause_handling|smooth_turn_taking|behavior, classify_*.py, aggregate.py
 ```

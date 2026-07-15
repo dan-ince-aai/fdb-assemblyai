@@ -37,6 +37,7 @@ SYSTEM_PROMPT = (
     "conversational — usually one or two sentences. Speak naturally."
 )
 PER_SAMPLE_TIMEOUT = 90.0
+TURN_DETECTION = None  # set from --turn-detection; merged into session.input
 
 
 def load_pcm16(path):
@@ -71,11 +72,14 @@ async def run_one(api_key, input_wav, output_wav, transcript_path):
     session_ended = asyncio.Event()
 
     async with websockets.connect(URL, extra_headers=headers, open_timeout=15) as ws:
+        input_cfg = {"type": "audio"}
+        if TURN_DETECTION:
+            input_cfg["turn_detection"] = TURN_DETECTION
         await ws.send(json.dumps({
             "type": "session.update",
             "session": {
                 "system_prompt": SYSTEM_PROMPT,
-                "input": {"type": "audio"},
+                "input": input_cfg,
                 "output": {"type": "audio", "voice": "alba"},
             },
         }))
@@ -241,7 +245,13 @@ def main():
                    help="Output WAV filename (default: output.wav). Use clean_output.wav for the second pass.")
     p.add_argument("--transcript-name", default="agent_transcript.json",
                    help="Transcript JSON filename (default: agent_transcript.json). Use clean_agent_transcript.json for the second pass.")
-    return asyncio.run(main_async(p.parse_args()))
+    p.add_argument("--turn-detection", default=None,
+                   help='JSON for session.input.turn_detection, e.g. \'{"min_silence": 2000}\'')
+    args = p.parse_args()
+    if args.turn_detection:
+        global TURN_DETECTION
+        TURN_DETECTION = json.loads(args.turn_detection)
+    return asyncio.run(main_async(args))
 
 
 if __name__ == "__main__":
