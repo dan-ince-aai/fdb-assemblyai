@@ -140,15 +140,19 @@ python3 charts/v1_turntaking_chart.py
 
 ## Headline numbers (from this repo)
 
-| Metric | AssemblyAI | Notes |
-|---|---|---|
-| **FDB v1.5 average — paper-faithful** | **74.8** | FDB's `evaluate.py --task behavior` verbatim. 4th overall; behind only TML-interaction-small (77.8) and Nova Sonic (77.5) |
-| Per-subset (paper-faithful) | UI 0.83 / UB 0.84 / TO 0.38 / BG 0.94 | Desired-behavior rate |
-| FDB v1 turn-taking latency | 1.62 s | mean on candor_turn_taking, Silero VAD |
-| User-interruption stop latency | 2.27 s | mean — matches Nova Sonic / Gemini Live |
-| User-interruption response latency (true) | 1.60 s mean / 1.20 s median | on samples classified RESPOND |
+Two full runs to date. May 2026: voice `ivy`, `agents.assemblyai.com`. July 2026: voice `alba`, `agents.us.assemblyai.com`, `session.end` teardown, concurrency 10. May numbers below are recomputed from archived artifacts with the July eval pipeline, so the columns are directly comparable.
 
-Per-subset breakdowns and the full trade-off discussion are in [report/FDB_REPORT.md](report/FDB_REPORT.md).
+| Metric | **July 2026** | May 2026 | Notes |
+|---|---|---|---|
+| **AA-style composite (equal weights)** | **73.4** | 84.1 | pause + turn-taking + interruption + backchannel |
+| Pause handling (1−TOR, candor/synthetic avg) | 45.7 | 69.6 | biggest regression — agent barges into pauses |
+| Turn-taking TOR / latency | 1.00 / **1.04 s** | 1.00 / 1.45 s | latency improved |
+| Interruption RESPOND (paper-faithful) | 0.81 | 0.83 | flat |
+| Backchannel RESUME (paper-faithful) | 0.67 | 0.84 | regressed |
+| FDB v1.5 average — primed GPT-4o | 71.0 | 82.7 | |
+
+Full July analysis (incl. the turn-detection-eagerness hypothesis and methodology fixes): [report/FDB_REPORT_2026-07.md](report/FDB_REPORT_2026-07.md).
+May run writeup: [report/FDB_REPORT.md](report/FDB_REPORT.md).
 
 ## License
 

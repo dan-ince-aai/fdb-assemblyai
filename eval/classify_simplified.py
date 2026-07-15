@@ -65,6 +65,19 @@ No other text."""
 
 
 def load_response_text(folder: Path) -> str:
+    # Prefer Whisper ASR of output.wav: it covers exactly the audible response
+    # window. Native transcript.agent events can miss the post-overlap reply
+    # (it arrives after the capture window), which misclassifies RESPOND
+    # samples as RESUME/UNKNOWN.
+    oj = folder / "output.json"
+    if oj.exists():
+        try:
+            data = json.loads(oj.read_text())
+            text = (data.get("text") or "").strip()
+            if text:
+                return text
+        except Exception:
+            pass
     f = folder / "agent_transcript.json"
     if not f.exists():
         return ""
@@ -104,11 +117,16 @@ Classify the response."""
         "seed": 0,
         "response_format": {"type": "json_object"},
     }
-    r = await client.post(
-        "https://api.openai.com/v1/chat/completions",
-        headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
-        json=payload, timeout=60.0,
-    )
+    for attempt in range(5):
+        r = await client.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
+            json=payload, timeout=60.0,
+        )
+        if r.status_code in (429, 500, 502, 503) and attempt < 4:
+            await asyncio.sleep(2 ** (attempt + 1))
+            continue
+        break
     r.raise_for_status()
     content = r.json()["choices"][0]["message"]["content"]
     parsed = json.loads(content)
@@ -121,7 +139,8 @@ Classify the response."""
 
 async def run_subset(client: httpx.AsyncClient, sem: asyncio.Semaphore, base: Path, scenario: str):
     root = base / "v1.5" / scenario
-    folders = sorted([d for d in root.iterdir() if d.is_dir() and d.name.isdigit()])
+    folders = sorted([d for d in root.iterdir() if d.is_dir() and d.name.isdigit()
+                      and not (d / "behaviour.json").exists()])
     cats = {"RESPOND": 0, "RESUME": 0, "UNCERTAIN": 0, "UNKNOWN": 0}
     errors = []
 

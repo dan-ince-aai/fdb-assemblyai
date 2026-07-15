@@ -30,7 +30,7 @@ import numpy as np
 import soundfile as sf
 import websockets
 
-URL = "wss://agents.assemblyai.com/v1/ws"
+URL = "wss://agents.us.assemblyai.com/v1/ws"
 TARGET_SR = 24_000
 SYSTEM_PROMPT = (
     "You are a helpful voice assistant. Keep your responses brief and "
@@ -68,6 +68,7 @@ async def run_one(api_key, input_wav, output_wav, transcript_path):
     reply_done = asyncio.Event()
     session_ready = asyncio.Event()
     first_greeting_done = asyncio.Event()
+    session_ended = asyncio.Event()
 
     async with websockets.connect(URL, extra_headers=headers, open_timeout=15) as ws:
         await ws.send(json.dumps({
@@ -75,7 +76,7 @@ async def run_one(api_key, input_wav, output_wav, transcript_path):
             "session": {
                 "system_prompt": SYSTEM_PROMPT,
                 "input": {"type": "audio"},
-                "output": {"type": "audio", "voice": "ivy"},
+                "output": {"type": "audio", "voice": "alba"},
             },
         }))
 
@@ -105,6 +106,8 @@ async def run_one(api_key, input_wav, output_wav, transcript_path):
                         first_greeting_done.set()
                     else:
                         reply_done.set()
+                elif t == "session.ended":
+                    session_ended.set()
 
         recv_task = asyncio.create_task(receiver())
         try:
@@ -127,6 +130,14 @@ async def run_one(api_key, input_wav, output_wav, transcript_path):
             try:
                 await asyncio.wait_for(reply_done.wait(), timeout=10)
             except asyncio.TimeoutError:
+                pass
+            # End the session explicitly: closing the socket without
+            # session.end leaves it resumable (and billable) for 30s,
+            # which counts against the per-key concurrent-session limit.
+            try:
+                await ws.send(json.dumps({"type": "session.end"}))
+                await asyncio.wait_for(session_ended.wait(), timeout=3)
+            except Exception:
                 pass
         finally:
             recv_task.cancel()
@@ -185,11 +196,18 @@ async def main_async(args):
         if out_wav.exists() and not args.overwrite:
             counts["skip"] += 1
             return f"SKIP {folder.name}: {output_name} already exists"
+        # timeout must cover real-time streaming of the whole input
+        # (some CANDOR samples exceed the 90s floor, e.g. 94s)
+        try:
+            info = sf.info(str(in_wav))
+            sample_timeout = max(PER_SAMPLE_TIMEOUT, info.frames / info.samplerate + 30)
+        except Exception:
+            sample_timeout = PER_SAMPLE_TIMEOUT
         async with sem:
             try:
                 await asyncio.wait_for(
                     run_one(api_key, in_wav, out_wav, tx),
-                    timeout=PER_SAMPLE_TIMEOUT,
+                    timeout=sample_timeout,
                 )
                 counts["ok"] += 1
                 return f"OK   {folder.name}"

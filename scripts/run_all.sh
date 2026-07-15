@@ -18,10 +18,11 @@ fi
 run_subset() {
   local label="$1"
   local path="$2"
+  shift 2
   echo "=================================================="
   echo "[$(date +%H:%M:%S)] starting $label"
   echo "=================================================="
-  python3 "$ADAPTER" "$path" --concurrency 5 \
+  python3 "$ADAPTER" "$path" --concurrency "${FDB_CONCURRENCY:-5}" "$@" \
     || echo "(subset $label exited non-zero — continuing)"
   echo "[$(date +%H:%M:%S)] finished $label"
 }

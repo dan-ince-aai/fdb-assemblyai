@@ -38,6 +38,19 @@ OVERLAP_TEXT_FIELDS = {
 
 
 def load_response_text(folder: Path) -> str:
+    # Prefer Whisper ASR of output.wav: it covers exactly the audible response
+    # window. Native transcript.agent events can miss the post-overlap reply
+    # (it arrives after the capture window), which misclassifies RESPOND
+    # samples as RESUME/UNKNOWN.
+    oj = folder / "output.json"
+    if oj.exists():
+        try:
+            data = json.loads(oj.read_text())
+            text = (data.get("text") or "").strip()
+            if text:
+                return text
+        except Exception:
+            pass
     f = folder / "agent_transcript.json"
     if not f.exists():
         return ""
