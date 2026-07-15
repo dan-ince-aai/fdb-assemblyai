@@ -144,12 +144,12 @@ Two full runs to date. May 2026: voice `ivy`, `agents.assemblyai.com`. July 2026
 
 | Metric | **July 2026** | May 2026 | Notes |
 |---|---|---|---|
-| **AA-style composite (equal weights)** | **73.4** | 84.1 | pause + turn-taking + interruption + backchannel |
-| Pause handling (1−TOR, candor/synthetic avg) | 45.7 | 69.6 | biggest regression — agent barges into pauses |
+| **AA-style composite (equal weights)** | **80.4** | 84.8 | pause + turn-taking + interruption + backchannel |
+| Pause handling (1−TOR, candor/synthetic avg) | 45.7 | 69.6 | the one real regression — agent barges into pauses |
 | Turn-taking TOR / latency | 1.00 / **1.04 s** | 1.00 / 1.45 s | latency improved |
-| Interruption RESPOND (paper-faithful) | 0.81 | 0.83 | flat |
-| Backchannel RESUME (paper-faithful) | 0.67 | 0.84 | regressed |
-| FDB v1.5 average — primed GPT-4o | 71.0 | 82.7 | |
+| Interruption RESPOND (paper-faithful) | 0.84 | 0.84 | identical |
+| Backchannel RESUME (paper-faithful) | **0.92** | 0.86 | improved (after whisper-on-alba transcript repair) |
+| FDB v1.5 average — paper-faithful | 70.5 | 75.4 | gap = talking_to_other + background_speech |
 
 Full July analysis (incl. the turn-detection-eagerness hypothesis and methodology fixes): [report/FDB_REPORT_2026-07.md](report/FDB_REPORT_2026-07.md).
 May run writeup: [report/FDB_REPORT.md](report/FDB_REPORT.md).
