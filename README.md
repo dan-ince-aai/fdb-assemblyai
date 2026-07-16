@@ -142,6 +142,8 @@ python3 charts/v1_turntaking_chart.py
 
 Three runs to date, all scored with one identical pipeline from raw artifacts. Key finding: sessions that omit `turn_detection` use a newer, more eager endpointing mode; sending any explicit `turn_detection` (even the documented defaults) pins classic fixed-window behavior — and recovers the May-level composite.
 
+Composite scores below use the AA-faithful definition (synthetic-only pause; see the sweep report). Best measured: **`turn_detection: {min_silence: 1200}` → 92.0**; ElevenLabs Agents stock, same pipeline → 86.8.
+
 | Metric | July default | **July + explicit turn_detection** | May 2026 |
 |---|---|---|---|
 | **AA-style composite (equal weights)** | 80.4 | **84.7** | 84.8 |
