@@ -152,6 +152,7 @@ Three runs to date, all scored with one identical pipeline from raw artifacts. K
 | FDB v1.5 average — paper-faithful | 70.5 | 70.3 | 75.4 |
 
 Full analysis, experiments, and measurement caveats: [report/FDB_REPORT_2026-07.md](report/FDB_REPORT_2026-07.md) (executive summary up top).
+Turn-detection config sweep (composite vs latency frontier): [report/CONFIG_SWEEP_2026-07.md](report/CONFIG_SWEEP_2026-07.md).
 May run writeup: [report/FDB_REPORT.md](report/FDB_REPORT.md).
 
 ## License

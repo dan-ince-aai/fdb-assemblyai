@@ -35,6 +35,7 @@ All three runs scored with one identical eval pipeline, from raw artifacts. 3,20
 | background_speech RESUME (v1.5 paper)* | 0.79 | 0.78 | 0.94 |
 | FDB v1.5 average — paper-faithful | 70.5 | 70.3 | 75.4 |
 | FDB v1.5 average — primed GPT-4o | 77.0 | 77.0 | 82.7 |
+| FDB v1.5 average — neutral GPT-4o | 75.3 | 76.5 | 81.9 |
 
 \* not part of the AA composite. AA's own weights/pipeline are unpublished; absolute comparison to their leaderboard is not meaningful — run-vs-run deltas on this pipeline are.
 
